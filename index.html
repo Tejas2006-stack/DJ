@@ -3,164 +3,158 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>New AI DJ Terminal</title>
+    <title>Neural DJ | Core</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.1/p5.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.1/addons/p5.sound.min.js"></script>
-    <script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 
     <style>
-        :root { --neon-blue: #00f3ff; --neon-pink: #ff00ff; --dark-space: #0a0a12; }
-        body { margin: 0; background: var(--dark-space); font-family: 'Rajdhani', sans-serif; color: white; display: flex; flex-direction: column; align-items: center; }
+        :root { --accent: #00ff41; --secondary: #ff003c; --bg: #050505; }
+        body { margin: 0; background: var(--bg); font-family: 'JetBrains Mono', monospace; color: var(--accent); display: flex; flex-direction: column; align-items: center; }
         
-        .dj-panel { margin-top: 20px; padding: 20px; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid var(--neon-blue); border-radius: 20px; text-align: center; width: 80%; max-width: 600px; }
-        h1 { font-family: 'Orbitron', sans-serif; background: linear-gradient(to right, var(--neon-blue), var(--neon-pink)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; }
+        .ui-header { width: 100%; border-bottom: 1px solid #1a1a1a; padding: 20px 0; text-align: center; }
+        .dashboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px 0; width: 600px; }
+        .module { background: #000; border: 1px solid #1a1a1a; padding: 10px; border-radius: 4px; }
+        .val { display: block; font-size: 1.5rem; color: #fff; }
 
-        .stats-container { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
-        .stat-card { background: rgba(0, 0, 0, 0.4); padding: 10px; border-radius: 10px; border-bottom: 2px solid var(--neon-blue); flex: 1; }
-        .value { font-size: 1.2rem; font-weight: bold; color: var(--neon-blue); }
-
-        #canvas-container { position: relative; margin-top: 20px; border-radius: 15px; border: 4px solid #1a1a2e; overflow: hidden; }
-        .controls { margin-top: 20px; display: flex; gap: 15px; margin-bottom: 40px; }
-
-        button { background: transparent; border: 2px solid var(--neon-blue); color: var(--neon-blue); padding: 12px 30px; font-family: 'Orbitron', sans-serif; border-radius: 30px; cursor: pointer; transition: 0.3s; }
-        button:hover { background: var(--neon-blue); color: black; box-shadow: 0 0 20px var(--neon-blue); }
+        #viewport { position: relative; border: 1px solid #333; line-height: 0; }
         
-        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--dark-space); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
+        .action-bar { margin: 20px 0; }
+        button { background: transparent; border: 1px solid var(--accent); color: var(--accent); padding: 10px 25px; cursor: pointer; font-family: inherit; font-size: 0.9rem; transition: 0.2s; }
+        button:hover { background: var(--accent); color: #000; }
+
+        #boot-screen { position: fixed; inset: 0; background: #000; z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .scanline { width: 200px; height: 2px; background: var(--accent); animation: scan 2s linear infinite; }
+        @keyframes scan { from { opacity: 0; } 50% { opacity: 1; } to { opacity: 0; } }
     </style>
 </head>
 <body>
 
-    <div id="loading-overlay">
-        <h1>Vision Engine Loading...</h1>
-        <p id="load-status">Downloading AI Models...</p>
+    <div id="boot-screen">
+        <div class="scanline"></div>
+        <p style="margin-top: 20px; letter-spacing: 2px;">SYNCING_NEURAL_NETS...</p>
     </div>
 
-    <div class="dj-panel">
-        <h1>AI GESTURE DJ</h1>
-        <div class="stats-container">
-            <div class="stat-card"><div>VOL</div><div id="vol-val" class="value">50%</div></div>
-            <div class="stat-card"><div>SPEED</div><div id="speed-val" class="value">1.0x</div></div>
-            <div class="stat-card"><div>BASS</div><div id="bass-val" class="value">Clear</div></div>
-        </div>
+    <div class="ui-header">
+        <h2 style="margin: 0; font-weight: 400; font-size: 1.2rem;">CORE_DJ_INTERFACE_v1.0.4</h2>
     </div>
 
-    <div id="canvas-container"></div>
+    <div class="dashboard">
+        <div class="module">GAIN <span id="v_out" class="val">--</span></div>
+        <div class="module">PITCH <span id="s_out" class="val">--</span></div>
+        <div class="module">FILTER <span id="b_out" class="val">--</span></div>
+    </div>
 
-    <div class="controls">
-        <button onclick="startAudio()" id="playBtn">START DJ DECK</button>
-        <button onclick="nextTrack()">SKIP TRACK</button>
+    <div id="viewport"></div>
+
+    <div class="action-bar">
+        <button onclick="handleIO()">I/O_SIGNAL</button>
+        <button onclick="skipTrack()">CYCLE_BUFFER</button>
     </div>
 
     <script>
-        let video, poseNet, poses = [];
-        let track, filter, fft;
-        let isLoaded = false;
-        let currentIndex = 0;
-        const playlist = [
+        let stream, net, data = [], src, lpf, fft;
+        let ptr = 0;
+        const lib = [
             "https://upload.wikimedia.org/wikipedia/commons/b/bb/Test_of_vocal_and_instrumental_music.mp3",
             "https://raw.githubusercontent.com/the-pudding/world-music/master/assets/music/1.mp3"
         ];
 
         function preload() {
-            track = loadSound(playlist[currentIndex], () => {
-                isLoaded = true;
-                document.getElementById('load-status').innerText = "Ready. Click Start below.";
-            });
+            src = loadSound(lib[ptr]);
         }
 
         function setup() {
-            const canvas = createCanvas(640, 480);
-            canvas.parent('canvas-container');
+            const c = createCanvas(600, 400);
+            c.parent('viewport');
             
-            video = createCapture(VIDEO);
-            video.size(640, 480);
-            video.hide();
+            stream = createCapture(VIDEO);
+            stream.size(600, 400);
+            stream.hide();
 
-            poseNet = ml5.poseNet(video, () => {
-                document.getElementById('loading-overlay').style.display = 'none';
+            const cfg = {
+                architecture: 'MobileNetV1',
+                imageScaleFactor: 0.3,
+                multiplier: 0.50,
+                outputStride: 16
+            };
+
+            net = ml5.poseNet(stream, cfg, () => {
+                document.getElementById('boot-screen').style.display = 'none';
             });
-            poseNet.on('pose', results => poses = results);
-            filter = new p5.LowPass();
+            
+            net.on('pose', r => data = r);
+
+            lpf = new p5.LowPass();
             fft = new p5.FFT();
-            track.disconnect();
-            track.connect(filter);
+            src.disconnect();
+            src.connect(lpf);
         }
 
-        function startAudio() {
-           
+        function handleIO() {
             userStartAudio();
-            if (track.isPlaying()) {
-                track.pause();
-                document.getElementById('playBtn').innerText = "RESUME";
-            } else {
-                track.play();
-                document.getElementById('playBtn').innerText = "PAUSE";
-            }
+            src.isPlaying() ? src.pause() : src.play();
         }
 
         function draw() {
-          
+            background(0);
             push();
             translate(width, 0);
             scale(-1, 1);
-            image(video, 0, 0, width, height);
+            image(stream, 0, 0, width, height);
             pop();
 
-            // 2. Audio Visualizer Overlay
-            let spectrum = fft.analyze();
-            noStroke();
-            fill(0, 243, 255, 150);
-            for (let i = 0; i < spectrum.length; i += 20) {
-                let h = -height + map(spectrum[i], 0, 255, height, 0);
-                rect(i, height, 15, h);
+            const spec = fft.analyze();
+            stroke(varColor('--accent'));
+            noFill();
+            beginShape();
+            for (let i = 0; i < spec.length; i += 10) {
+                let y = map(spec[i], 0, 255, height, height - 100);
+                vertex(i, y);
             }
+            endShape();
 
-            // 3. Pose Interaction
-            if (poses.length > 0) {
-                let pose = poses[0].pose;
-                let lw = pose.leftWrist;
-                let rw = pose.rightWrist;
+            if (data.length > 0) {
+                const { leftWrist: l, rightWrist: r } = data[0].pose;
 
-                // Left Wrist -> Volume & Pan
-                if (lw.confidence > 0.3) {
-                    let vol = map(lw.y, height, 0, 0, 1);
-                    track.setVolume(constrain(vol, 0, 1));
-                    document.getElementById('vol-val').innerText = Math.round(vol * 100) + "%";
-                    drawMarker(lw.x, lw.y, '#00f3ff', "VOL/PAN");
+                if (l.confidence > 0.2) {
+                    const g = constrain(map(l.y, height, 0, 0, 1), 0, 1);
+                    src.setVolume(g);
+                    document.getElementById('v_out').innerText = `${Math.round(g * 100)}%`;
+                    renderNode(width - l.x, l.y, varColor('--accent'));
                 }
 
-                // Right Wrist -> Speed & Filter
-                if (rw.confidence > 0.3) {
-                    let speed = map(rw.y, height, 0, 0.5, 2.0);
-                    track.rate(constrain(speed, 0.5, 2.0));
-                    document.getElementById('speed-val').innerText = speed.toFixed(1) + "x";
-
-                    let fFreq = map(rw.x, 0, width, 200, 5000);
-                    filter.freq(fFreq);
-                    document.getElementById('bass-val').innerText = fFreq < 1000 ? "Heavy" : "Clear";
-                    drawMarker(rw.x, rw.y, '#ff00ff', "BASS/SPD");
+                if (r.confidence > 0.2) {
+                    const s = constrain(map(r.y, height, 0, 0.5, 2), 0.5, 2);
+                    src.rate(s);
+                    document.getElementById('s_out').innerText = `${s.toFixed(1)}x`;
+                    
+                    const f = map(r.x, 0, width, 200, 4000);
+                    lpf.freq(f);
+                    document.getElementById('b_out').innerText = f < 1000 ? 'ACTIVE' : 'BYPASS';
+                    renderNode(width - r.x, r.y, varColor('--secondary'));
                 }
             }
         }
 
-        function drawMarker(x, y, col, txt) {
-            // Mirrored coords for drawing markers
-            let mx = width - x;
-            fill(col);
-            ellipse(mx, y, 15, 15);
-            textSize(16);
-            text(txt, mx + 20, y);
+        function varColor(v) {
+            return getComputedStyle(document.documentElement).getPropertyValue(v).trim();
         }
 
-        function nextTrack() {
-            track.stop();
-            currentIndex = (currentIndex + 1) % playlist.length;
-            track = loadSound(playlist[currentIndex], () => {
-                track.play();
-                track.disconnect();
-                track.connect(filter);
+        function renderNode(x, y, c) {
+            fill(c); noStroke(); ellipse(x, y, 8);
+            stroke(c); noFill(); ellipse(x, y, 16 + sin(frameCount * 0.2) * 5);
+        }
+
+        function skipTrack() {
+            src.stop();
+            ptr = (ptr + 1) % lib.length;
+            src = loadSound(lib[ptr], () => {
+                src.play();
+                src.disconnect();
+                src.connect(lpf);
             });
         }
     </script>
