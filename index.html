@@ -1,38 +1,263 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <title>AI DJ</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/css/bootstrap.min.css">
-        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/js/bootstrap.min.js"></script>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro AI DJ Terminal</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.1/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.1/addons/p5.sound.min.js"></script>
+    <script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500&display=swap" rel="stylesheet">
 
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.0.0/p5.js"></script>
+    <style>
+        :root {
+            --neon-blue: #00f3ff;
+            --neon-pink: #ff00ff;
+            --dark-space: #0a0a12;
+        }
 
-         <script src="https://unpkg.com/ml5@0.4.3/dist/ml5.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.2.0/addons/p5.sound.js"></script>
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--dark-space);
+            font-family: 'Rajdhani', sans-serif;
+            color: white;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
 
-        <link rel="stylesheet" type="text/css" href="style.css">
+    
+        .dj-panel {
+            margin-top: 20px;
+            padding: 20px 40px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 243, 255, 0.3);
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
+            z-index: 10;
+        }
 
-    </head>
-    <body background="cropped-studio_aim_musiclab_royalty_free_background_music.jpg">
-        <center>
-            <div id="header" class="btn btn-warning">
-                <h3>Old age home party
-                </h3>
-                <span class="instructions">Move your hand up and down to change the volume of the song, and move your hand from side to side to change the speed of the song too</span>
-            </div>
-            <br>
-            <br>
-            <br> <br> 
-            <div class="btn btn-success">Speed:</div>
-            <div class= "btn btn-warning">Volume: </div>
-            <br> <br>
-            <button id="playButton" class="btn btn-info" onclick="play()">Play</button>
-            &nbsp;
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2rem;
+            margin: 0;
+            background: linear-gradient(to right, var(--neon-blue), var(--neon-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+        }
 
-            <button id="pauseButton" class="btn btn-info" onclick="pause()">Pause</button>
-        </center>
+        .stats-container {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+        }
 
-    </body>
+        .stat-card {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 10px 20px;
+            border-radius: 10px;
+            border-bottom: 2px solid var(--neon-blue);
+            min-width: 120px;
+        }
+
+        .label { font-size: 0.8rem; color: #888; text-transform: uppercase; }
+        .value { font-size: 1.2rem; font-weight: bold; color: var(--neon-blue); }
+
+        #canvas-container {
+            position: relative;
+            margin-top: 20px;
+            border-radius: 15px;
+            border: 4px solid #1a1a2e;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+        }
+
+        button {
+            background: transparent;
+            border: 2px solid var(--neon-blue);
+            color: var(--neon-blue);
+            padding: 10px 30px;
+            font-family: 'Orbitron', sans-serif;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background: var(--neon-blue);
+            color: black;
+            box-shadow: 0 0 20px var(--neon-blue);
+        }
+
+        #loading-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--dark-space);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loading-overlay">
+        <h1 style="margin-bottom: 20px;">Calibrating AI Deck...</h1>
+        <div style="color: var(--neon-blue)">Please wait for PoseNet & Audio Engines</div>
+    </div>
+
+    <div class="dj-panel">
+        <h1>AI Gesture DJ</h1>
+        <div class="stats-container">
+            <div class="stat-card"><div class="label">Volume</div><div id="vol-val" class="value">0%</div></div>
+            <div class="stat-card"><div class="label">Speed</div><div id="speed-val" class="value">1.0x</div></div>
+            <div class="stat-card"><div class="label">Bass Filter</div><div id="bass-val" class="value">Off</div></div>
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <div class="controls">
+        <button onclick="togglePlay()" id="playBtn">Initialize Audio</button>
+        <button onclick="nextSong()">Next Track</button>
+    </div>
+
+    <script>
+        let video, poseNet, poses = [];
+        let track, filter;
+        let isPlaying = false;
+        let currentSongIndex = 0;
+        
+        // Add your song URLs here
+        const playlist = [
+            'https://p.scrubtheweb.com/media/test.mp3', 
+            'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'
+        ];
+
+        function preload() {
+            track = loadSound(playlist[currentSongIndex]);
+        }
+
+        function setup() {
+            const canvas = createCanvas(640, 480);
+            canvas.parent('canvas-container');
+            
+            video = createCapture(VIDEO);
+            video.size(width, height);
+            video.hide();
+
+            // Initialize PoseNet
+            poseNet = ml5.poseNet(video, () => {
+                document.getElementById('loading-overlay').style.display = 'none';
+            });
+            
+            poseNet.on('pose', results => poses = results);
+
+            // Audio Filter (Low Pass for Bass control)
+            filter = new p5.LowPass();
+            track.disconnect();
+            track.connect(filter);
+        }
+
+        function draw() {
+            // Mirror and Display
+            translate(width, 0);
+            scale(-1, 1);
+            image(video, 0, 0, width, height);
+            
+            drawVisualizer();
+
+            if (poses.length > 0) {
+                let pose = poses[0].pose;
+                let lw = pose.leftWrist;
+                let rw = pose.rightWrist;
+
+                // Only act if points are visible (confidence > 0.2)
+                if (lw.confidence > 0.2) {
+                    // VOLUME: Map Y-axis (height) to 0.0 - 1.0
+                    let vol = map(lw.y, height, 0, 0, 1);
+                    vol = constrain(vol, 0, 1);
+                    track.setVolume(vol);
+                    document.getElementById('vol-val').innerText = Math.round(vol * 100) + "%";
+                    
+                    // PANNING: Map X-axis to -1 (left) to 1 (right)
+                    let pan = map(lw.x, width, 0, 1, -1);
+                    track.pan(pan);
+
+                    drawGhostPoint(lw.x, lw.y, '#00f3ff');
+                }
+
+                if (rw.confidence > 0.2) {
+                    // SPEED: Map Y-axis to 0.5x - 2.0x
+                    let speed = map(rw.y, height, 0, 0.5, 2.0);
+                    track.rate(speed);
+                    document.getElementById('speed-val').innerText = speed.toFixed(1) + "x";
+
+                    // BASS (Filter): Map X-axis to Filter Frequency
+                    let freq = map(rw.x, 0, width, 200, 10000);
+                    filter.freq(freq);
+                    document.getElementById('bass-val').innerText = freq < 1000 ? "Heavy" : "Clear";
+
+                    drawGhostPoint(rw.x, rw.y, '#ff00ff');
+                }
+                
+                // GESTURE: Skip song if hands come together
+                let d = dist(lw.x, lw.y, rw.x, rw.y);
+                if (d < 50 && lw.confidence > 0.5) {
+                    nextSong();
+                }
+            }
+        }
+
+        function drawGhostPoint(x, y, col) {
+            fill(col);
+            noStroke();
+            ellipse(x, y, 20, 20);
+            stroke(col);
+            noFill();
+            ellipse(x, y, 40 + sin(frameCount * 0.1) * 10);
+        }
+
+        function drawVisualizer() {
+            // Simple visual "bars" based on volume
+            let level = track.getLevel();
+            fill(0, 243, 255, 100);
+            rect(0, height - (level * 1000), 20, height);
+            rect(width-20, height - (level * 1000), 20, height);
+        }
+
+        function togglePlay() {
+            if (track.isPlaying()) {
+                track.pause();
+                document.getElementById('playBtn').innerText = "Resume";
+            } else {
+                track.play();
+                document.getElementById('playBtn').innerText = "Pause";
+            }
+        }
+
+        function nextSong() {
+            track.stop();
+            currentSongIndex = (currentSongIndex + 1) % playlist.length;
+            track = loadSound(playlist[currentSongIndex], () => {
+                track.play();
+                track.disconnect();
+                track.connect(filter);
+            });
+        }
+    </script>
+</body>
 </html>
